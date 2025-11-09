@@ -1,35 +1,45 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from sklearn.linear_model import LinearRegression
+import numpy as np
 
 st.title("Mai Shan Yun Data Analysis")
 
-orders = pd.read_csv("RestaurantData.csv")
-ingredients = pd.read_csv("IngredientsUsed.csv")
+orders = pd.read_csv("Restaurant Data.csv", thousands=',')
+ingredients = pd.read_csv("IngredientsUsed.csv", thousands=',')
 shipments = pd.read_csv("MSY Data - Shipment.csv")
 
 ## INGREDIENT USAGE BY MONTH ##
 # combines orders and ingredients into one table
-usage = orders.merge(ingredients, on="Item name")
+usage = orders.merge(ingredients, on="Item Name")
 
-ingredient_cols = ingredients.columns.drop("Item name")  # all ingredient columns
+ingredient_cols = ingredients.columns.drop("Item Name")  # all ingredient columns
 
 # multiply each ingredient column by the Count of dishes sold
+# Ensure Count column is numeric
+usage["Count"] = pd.to_numeric(usage["Count"], errors="coerce").fillna(0)
+
+# Convert all ingredient columns to numeric
 for col in ingredient_cols:
     usage[col] = usage[col] * usage["Count"]
 
-months_in_data = ["May", "June", "July", "August", "September"]
-usage["Month"] = pd.Categorical(
-    usage["Month"],
-    categories=months_in_data,
-    ordered=True
-)
+
+# months_in_data = ["May", "June", "July", "August", "September", "October"]
+# usage["Month"] = pd.Categorical(
+#     usage["Month"],
+#     categories=months_in_data,
+#     ordered=True
+# )
+st.write("Unique month values:", usage["Month"].unique())
+
 
 monthly_totals = usage.groupby("Month")[ingredient_cols].sum().reset_index()
 monthly_totals = monthly_totals.sort_values("Month")  # uses the categorical order
 
 
 st.subheader("Ingredients used per month")
+monthly_totals = monthly_totals.loc[:, (monthly_totals != 0).any(axis=0)]
 st.dataframe(monthly_totals)
 
 
@@ -44,77 +54,55 @@ fig = px.imshow(
 st.plotly_chart(fig)
 
 
+# Ingredient spread across months
+ingredient_pct = monthly_totals.copy()
 
-## Amount left ##
-#shipment - quantity
-shipments = pd.read_csv("MonthlyShipments.csv")
+# Divide each ingredient column by its total across all months
+ingredient_pct[ingredient_cols] = ingredient_pct[ingredient_cols].div(
+    ingredient_pct[ingredient_cols].sum(axis=0), axis=1
+) * 100
 
-# Equate the files
-ingredient_mapping = {
-    "braised beef used (g)": "Beef",
-    "Braised Chicken(g)": "Chicken",
-    "Braised Pork(g)": "Pork",
-    "Egg(count)": "Egg",
-    "Rice(g)": "Rice",
-    "Ramen (count)": "Ramen",
-    "Rice Noodles(g)": "Rice Noodles",
-    "chicken thigh (pcs)": "Chicken Thigh",
-    "Chicken Wings (pcs)": "Chicken Wings",
-    "flour (g)": "Flour",
-    "Pickle Cabbage": "Pickle Cabbage",
-    "Green Onion": "Green Onion",
-    "Cilantro": "Cilantro",
-    "White onion": "White Onion",
-    "Peas(g)": "Peas + Carrot",
-    "Carrot(g)": "Peas + Carrot",
-    "Boychoy(g)": "Bokchoy",
-    "Tapioca Starch": "Tapioca Starch"
-}
+# Now each column sums to 100% (distribution of that ingredient across months)
+heatmap_data = ingredient_pct.set_index("Month")[ingredient_cols]
 
-# Rename columns
-ingredients_renamed = ingredients.rename(columns=ingredient_mapping)
-
-# Combine Peas + Carrot into one column
-ingredients_renamed["Peas + Carrot"] = (
-    ingredients_renamed[["Peas + Carrot", "Peas + Carrot"]].sum(axis=1)
-)
-
-# Melt into long format: Item name, Ingredient, AmountUsed
-ingredients_long = ingredients_renamed.melt(
-    id_vars="Item name",
-    value_vars=ingredients_renamed.columns[1:],  # all ingredient columns
-    var_name="Ingredient",
-    value_name="AmountUsed"
-)
-
-# Pivot so ingredients are rows and items are columns
-ingredients_pivot = ingredients_long.pivot_table(
-    index="Ingredient",
-    columns="Item name",
-    values="AmountUsed",
-    aggfunc="sum"  # combine duplicates like Peas + Carrot
-).reset_index()
-
-# Load shipments
-shipments = pd.read_csv("MonthlyShipments.csv")
-shipments.columns = shipments.columns.str.strip()
-shipment_dict = dict(zip(shipments["Ingredient"], shipments["quantity"]))
-
-# Add shipment quantity column
-ingredients_pivot["Shipment Quantity"] = ingredients_pivot["Ingredient"].map(shipment_dict)
-
-# Streamlit display
-st.subheader("Ingredient Usage by Item")
-st.dataframe(ingredients_pivot)
-import plotly.express as px
-
-# ingredients_pivot: rows = ingredients, columns = items
 fig = px.imshow(
-    ingredients_pivot.drop(columns=["Shipment Quantity","TotalUsed","StockRemaining"]), 
-    labels=dict(x="Menu Item", y="Ingredient", color="Usage (g)"),
-    color_continuous_scale="Viridis"
+    heatmap_data.T,
+    labels=dict(x="Month", y="Ingredient", color="% of Total Usage"),
+    title="Ingredient Usage Spread Across Months",
+    aspect="auto",
+    text_auto=True
 )
 st.plotly_chart(fig)
+
+predictions = pd.DataFrame({"Ingredient": ingredient_cols})
+
+for col in ingredient_cols:
+    y = monthly_totals[col].values
+    X = np.arange(len(monthly_totals)).reshape(-1,1)  # 0,1,2,... for months
+    model = LinearRegression()
+    model.fit(X, y)
+    
+    # Predict next 3 months
+    X_future = np.arange(len(monthly_totals), len(monthly_totals)+3).reshape(-1,1)
+    pred = model.predict(X_future)
+    
+    predictions[col] = np.round(pred, 1)
+
+predictions.index = ["Next Month 1", "Next Month 2", "Next Month 3"]
+st.subheader("Predicted Ingredient Usage for Next 3 Months")
+st.dataframe(predictions.T)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

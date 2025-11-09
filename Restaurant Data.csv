@@ -454,20 +454,20 @@ May,Ramune - Strawberry,2,6.28
 May,Water,2122,0
 May,Sweet Sesame Ball (6) w. red bean,1,4.5
 May,Golden kiwi,5,18.38
-October,Tossed Rice Noodle,391,"5,971.41"
-October,Tossed Ramen,460,"6,591.08"
-October,Ramen,940,"14,097.72"
-October,Fried Chicken,939,"10,965.23"
+October,Tossed Rice Noodle,391,5971.41
+October,Tossed Ramen,460,6591.08
+October,Ramen,940,14097.72
+October,Fried Chicken,939,10965.23
 October,Fruit Tea,105,460.01
-October,Fried Rice,492,"6,911.21"
+October,Fried Rice,492,6911.21
 October,Additonal,198,508.54
-October,Appetizer,"1,241","7,416.47"
+October,Appetizer,1241,7416.47
 October,Dessert,31,153.64
-October,Lunch Special,366,"5,149.01"
-October,Milk Tea,555,"2,527.77"
-October,Special Offer,115,"1,344.64"
-October,Wonton,213,"2,406.52"
-October,Drink,"2,996","1,820.99"
+October,Lunch Special,366,5149.01
+October,Milk Tea,555,2527.77
+October,Special Offer,115,1344.64
+October,Wonton,213,2406.52
+October,Drink,2996,1820.99
 October,Open Food,2,9.31
 October,Bingsu,12,60.52
 October,Combo Items,0,0
@@ -578,6 +578,4 @@ September,Mai‘s Special Sauce,1,1
 September,Water,2320,0
 September,Sliced Fruit  - 5 day expiration,1,0
 September,House Tossed Rice Noodle,1,15.99
-,,,
-,,,
-,,38537,
+
