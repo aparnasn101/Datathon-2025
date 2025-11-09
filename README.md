@@ -77,5 +77,17 @@ We condensed this data into the following files that we used for the dashboard:
 Make sure these files are placed in the same directory as `app.py`, `app2.py`, and `low_ingredients_alert.py`.
 
 ---
+## Setup and Run instructions
 
+git clone https://github.com/aparnasn101/Datathon-2025.git
+cd Datathon-2025
+pip install -r requirements.txt
+
+Then open the URL in your browser.
+
+## Example Use Cases
+Restaurant Managers: Identify which ingredients to restock based on monthly usage.
+Inventory Teams: Compare shipments vs. ingredient consumption for efficiency.
+Operations & Finance: Predict and budget future ingredient costs.
+Data Analysts: Explore seasonal patterns and optimize menu offerings.
 
