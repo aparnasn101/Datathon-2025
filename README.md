@@ -48,14 +48,16 @@ Built for **Mai Shan Yun** as part of a data analysis project for TAMU Datathon 
 ## Data Files
 
 We used the following data files to create new files to be used for the dashboard:
-August_Data_Matrix (1).xlsx
-July_Data_Matrix (1).xlsx
-June_Data_Matrix.xlsx
-MSY Data - Ingredient.csv
-MSY Data - Shipment.csv
-May_Data_Matrix (1).xlsx
-October_Data_Matrix_20251103_214000.xlsx
-September_Data_Matrix.xlsx
+| File |
+|---------------|
+| `August_Data_Matrix (1).xlsx` |
+| `July_Data_Matrix (1).xlsx` |
+| `June_Data_Matrix.xlsx` |
+| `MSY Data - Ingredient.csv` |
+| `MSY Data - Shipment.csv` |
+| `May_Data_Matrix (1).xlsx` |
+| `October_Data_Matrix_20251103_214000.xlsx` |
+| `September_Data_Matrix.xlsx` |
 
 We condensed this data into the following files that we used for the dashboard:
 | File | Description |
