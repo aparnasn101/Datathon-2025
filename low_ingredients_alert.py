@@ -1,3 +1,4 @@
+
 # ------------------------------
 # 11) SIDEBAR: RESTOCK RECOMMENDATIONS (SHIPMENT FILE) - robust & formatted
 # ------------------------------
@@ -206,5 +207,6 @@ else:
                 for line in a["rec_text"].split("\n"):
                     st.sidebar.markdown(f"- {line}")
                 st.sidebar.markdown("")  # small spacer
+
 
 
