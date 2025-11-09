@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from sklearn.linear_model import LinearRegression
 import calendar
 
@@ -14,37 +16,6 @@ st.title("Mai Shan Yun Data Analysis")
 orders = pd.read_csv("Restaurant Data.csv", thousands=',')
 ingredients = pd.read_csv("IngredientsUsed.csv", thousands=',')
 shipments = pd.read_csv("MSY Data - Shipment.csv")  # not used yet, but loaded
-
-# ------------------------------
-# 2) NORMALIZE HEADERS & REQUIRED FIELDS
-# ------------------------------
-# Bring headers to a consistent form the rest of the code expects.
-rename_map_orders = {}
-if "Month" not in orders.columns and "month" in orders.columns:
-    rename_map_orders["month"] = "Month"
-if "Item Name" not in orders.columns and "item name" in orders.columns:
-    rename_map_orders["item name"] = "Item Name"
-if "Count" not in orders.columns and "count" in orders.columns:
-    rename_map_orders["count"] = "Count"
-if "Amount" not in orders.columns and "amount" in orders.columns:
-    rename_map_orders["amount"] = "Amount"
-if rename_map_orders:
-    orders.rename(columns=rename_map_orders, inplace=True)
-
-# Ingredients: ensure recipe key exists with same casing
-rename_map_ingredients = {}
-if "Item Name" not in ingredients.columns and "item name" in ingredients.columns:
-    rename_map_ingredients["item name"] = "Item Name"
-if rename_map_ingredients:
-    ingredients.rename(columns=rename_map_ingredients, inplace=True)
-
-# Month formatting (e.g., 'october' -> 'October')
-orders["Month"] = orders["Month"].astype(str).str.strip().str.title()
-
-# Count numeric
-if "Count" not in orders.columns:
-    st.error("Orders file is missing a 'Count' column. Found columns: " + ", ".join(orders.columns))
-orders["Count"] = pd.to_numeric(orders["Count"], errors="coerce").fillna(0)
 
 # Explicit month order
 months_in_data = ["May", "June", "July", "August", "September", "October"]
@@ -64,16 +35,6 @@ usage = orders.merge(ingredients, on="Item Name", how="left", indicator=True)
 # Ingredient columns are everything from ingredients except the key
 ingredient_cols = [c for c in ingredients.columns if c != "Item Name"]
 
-# ------------------------------
-# 4) DIAGNOSTICS: WHAT DIDN'T MATCH (COMMON IN OCTOBER)
-# ------------------------------
-unmatched = usage[usage["_merge"] == "left_only"].copy()
-st.write("**Unique month values:**", [str(m) for m in orders["Month"].dropna().unique()])
-st.caption("Diagnostics: unmatched item rows (orders that had no recipe match)")
-st.write("Unmatched count by month:", unmatched.groupby("Month").size().to_dict() if not unmatched.empty else {})
-if not unmatched.empty:
-    sample_oct = unmatched.loc[unmatched["Month"] == "October", "Item Name"].dropna().unique()[:25]
-    st.write("Sample unmatched October items:", list(sample_oct))
 
 # ------------------------------
 # 5) BUILD INGREDIENT USAGE
@@ -164,20 +125,109 @@ else:
 
     st.dataframe(predictions.T)  # rows = ingredients, cols = future months
 
-# ------------------------------
-# 10) (OPTIONAL) HOW TO FIX OCTOBER NUMBERS
-# ------------------------------
-with st.expander("Why October looks empty & how to fix it"):
-    st.markdown(
-        """
-**Why October is zeroed:** In October your `Restaurant Data.csv` uses **category names** like
-“Ramen”, “Fried Chicken”, “Drink”, etc. Those **do not match** the detailed menu names in
-`IngredientsUsed.csv`, so the left join can’t find a recipe → ingredient usage becomes 0.
+##
 
-**Two ways to fix:**
-1. **Add recipe rows** to `IngredientsUsed.csv` for those category items (“Ramen”, “Fried Chicken”, “Drink”, …),
-   with the correct per-item ingredient amounts.
-2. **Map the category names to existing recipes** in code (e.g., map “Ramen” → “Beef Ramen” recipe, etc.),
-   then merge. If you want this, tell me the mappings you prefer and I’ll add a small dictionary to translate before the merge.
-        """
+c1,c2 = st.columns([1,3])
+#Creates buttons to switch through months
+with c1:
+    st.markdown("Top Dishes Per Month")
+    graph_option = st.radio(
+        "Select Month",
+        ('May','June','July','August','September','October')
     )
+with c2:
+    
+    if graph_option == 'May':
+        May = 'MayDishes.csv'
+        if May is not None:
+            df = pd.read_csv(May)
+
+            df_sorted = df.sort_values(by='Count',ascending=False) #orders them
+            top = df_sorted.head(5) #takes the top 3 for the graph
+            fig,ax = plt.subplots()
+            ax.bar(top['Item Name'],top['Count'],color='skyblue')
+            ax.set_xlabel('Dishes')
+            ax.set_ylabel('Amount Ordered')
+            ax.set_title("May")
+            st.pyplot(fig)
+
+    elif graph_option == 'June':
+        June = 'JuneDishes.csv'
+        if June is not None:
+            df = pd.read_csv(June)
+            
+     
+            df_sorted = df.sort_values(by='Count',ascending=False)
+            top = df_sorted.head(5) 
+            fig,ax = plt.subplots()
+            ax.bar(top['Item Name'],top['Count'],color='skyblue')
+            ax.set_xlabel('Dishes')
+            ax.set_ylabel('Amount Ordered')
+            ax.set_title("June")
+            st.pyplot(fig)
+
+    elif graph_option == 'July':
+        July = 'JulyDishes.csv'
+        if July is not None:
+            df = pd.read_csv(July)
+    
+
+            df_sorted = df.sort_values(by='Count',ascending=False)
+            top = df_sorted.head(5)
+            fig,ax = plt.subplots()
+            ax.bar(top['Item Name'],top['Count'],color='skyblue')
+            ax.set_xlabel('Dishes')
+            ax.set_ylabel('Amount Ordered')
+            ax.set_title("July")
+            st.pyplot(fig)
+
+    elif graph_option == 'August':
+        August = 'AugustDishes.csv'
+        if August is not None:
+            df = pd.read_csv(August)
+     
+
+            df_sorted = df.sort_values(by='Count',ascending=False)
+            top = df_sorted.head(5)
+            fig,ax = plt.subplots()
+            ax.bar(top['Item Name'],top['Count'],color='skyblue')
+            ax.set_xlabel('Dishes')
+            ax.set_ylabel('Amount Ordered')
+            ax.set_title("August")
+            st.pyplot(fig)
+
+    elif graph_option == 'September':
+        September = 'SeptemberDishes.csv'
+        if September is not None:
+            df = pd.read_csv(September)
+           
+
+            df_sorted = df.sort_values(by='Count',ascending=False)
+            top = df_sorted.head(5)
+            fig,ax = plt.subplots()
+            ax.bar(top['Item Name'],top['Count'],color='skyblue')
+            ax.set_xlabel('Dishes')
+            ax.set_ylabel('Amount Ordered')
+            ax.set_title("September")
+            st.pyplot(fig)
+
+    elif graph_option == 'October':
+        October = 'OctoberDishes.csv'
+        if October is not None:
+            df = pd.read_csv(October)
+          
+
+            df_sorted = df.sort_values(by='Count',ascending=False)
+            top = df_sorted.head(5)
+            fig,ax = plt.subplots()
+            ax.bar(top['Item Name'],top['Count'],color='skyblue')
+            ax.set_xlabel('Dishes')
+            ax.set_ylabel('Amount Ordered')
+            ax.set_title("October")
+            st.pyplot(fig)
+
+
+   
+
+            
+
