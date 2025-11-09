@@ -3,7 +3,7 @@
 
 An interactive **Streamlit dashboard** for analyzing ingredient usage, monthly trends, and forecasting future demand for Mai Shan Yun’s restaurant operations.
 
-# 🥡 Mai Shan Yun Data Analysis Dashboard
+# Mai Shan Yun Data Analysis Dashboard
 
 An interactive **Streamlit dashboard** for analyzing ingredient usage, monthly trends, and forecasting future demand for Mai Shan Yun’s restaurant operations.
 
@@ -45,7 +45,7 @@ Built for **Mai Shan Yun** as part of a data analysis project for TAMU Datathon 
 
 ---
 
-## 🗂️ Data Files
+## Data Files
 
 We used the following data files to create new files to be used for the dashboard:
 August_Data_Matrix (1).xlsx
