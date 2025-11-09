@@ -1,212 +1,102 @@
-
 # ------------------------------
-# 11) SIDEBAR: RESTOCK RECOMMENDATIONS (SHIPMENT FILE) - robust & formatted
+# 10) SIDEBAR: INGREDIENTS RUNNING LOW + DETAILED RESTOCK RECOMMENDATIONS
 # ------------------------------
-import difflib
-from textwrap import dedent
+import datetime
+st.sidebar.header("⚠️ Ingredients Running Low")
 
-def _find_best_match(name, choices):
-    """Return best matching key from choices for name (case-insensitive); or None."""
-    if name is None:
-        return None
-    name_l = name.strip().lower()
-    choices_l = {c: c.strip().lower() for c in choices}
-    # exact match
-    for c, c_l in choices_l.items():
-        if c_l == name_l:
-            return c
-    # startswith / contains
-    for c, c_l in choices_l.items():
-        if name_l in c_l or c_l in name_l:
-            return c
-    # fuzzy
-    close = difflib.get_close_matches(name_l, list(choices_l.values()), n=1, cutoff=0.6)
-    if close:
-        # find original key
-        for c, c_l in choices_l.items():
-            if c_l == close[0]:
-                return c
-    return None
+# Timestamp of check
+today = datetime.datetime.now()
+st.sidebar.markdown(f"📅 **Status checked:** {today.strftime('%B %d, %Y')}")
 
-# Ensure shipments DF exists
-try:
-    shipment_df = shipments.copy()
-except Exception as e:
-    st.sidebar.error(f"Shipment data not loaded: {e}")
-    shipment_df = None
-
-st.sidebar.markdown("---")
-st.sidebar.header("📦 Restock Recommendations (from shipments)")
-
-if shipment_df is None or shipment_df.empty:
-    st.sidebar.info("No shipment data found. Please ensure 'MSY Data - Shipment.csv' is in the project folder.")
+if len(valid_cols) == 0:
+    st.sidebar.info("No valid ingredients available to check.")
 else:
-    # normalize shipment column names to friendly keys by substring matching
-    cols = {c.lower().strip(): c for c in shipment_df.columns}
-    # mapping expected fields (use substring matching)
-    def _col(keys):
-        for k in keys:
-            for low, orig in cols.items():
-                if k in low:
-                    return orig
-        return None
+    last_month = months_in_data[-1]
+    current_data = monthly_totals[monthly_totals["Month"] == last_month]
 
-    col_ing = _col(["ingredient", "item", "name"])
-    col_qty_per = _col(["quantity per", "quantity", "qty", "quantity per shipment"])
-    col_unit = _col(["unit", "unit of", "unit of shipment"])
-    col_num_ship = _col(["number of", "num", "number of shipments"])
-    col_freq = _col(["frequency", "freq"])
-    col_total_received = _col(["total received", "total", "received"])
-    col_est_week = _col(["estimated weekly", "estimated weekly supply", "weekly supply", "estimated"])
+    max_per_ing = monthly_totals[valid_cols].max()
+    current_vals = current_data[valid_cols].iloc[0]
+    percent_remaining = (current_vals / max_per_ing) * 100
+    low_ingredients = percent_remaining[percent_remaining <= 25]
 
-    # show a small table in the sidebar so user can confirm the shipment file mapping
-    st.sidebar.subheader("Shipment file preview")
-    display_cols = [c for c in [col_ing, col_qty_per, col_unit, col_num_ship, col_freq, col_total_received, col_est_week] if c]
-    if len(display_cols) == 0:
-        st.sidebar.error("Shipment file columns could not be auto-detected. Expected columns like: Ingredient, Quantity per shipment, Unit of shipment, Number of shipments, frequency, Total Received, Estimated Weekly Supply")
+    if low_ingredients.empty:
+        st.sidebar.success("✅ No ingredients currently running low!")
     else:
-        # show first 8 rows
-        st.sidebar.dataframe(shipment_df[display_cols].head(8).rename(columns=lambda x: x.strip()), height=240)
+        st.sidebar.warning(f"{len(low_ingredients)} ingredients running low.")
+        
+        # Bar chart
+        fig_low, ax_low = plt.subplots(figsize=(5, len(low_ingredients) * 0.4))
+        ax_low.barh(low_ingredients.index, low_ingredients.values, color="salmon")
+        ax_low.set_xlabel("% Remaining")
+        ax_low.set_title(f"Ingredients Running Low - {last_month}")
+        plt.tight_layout()
+        st.sidebar.pyplot(fig_low)
 
-        # Normalize frequency into shipments/month (approx)
-        freq_map = {
-            "weekly": 4,
-            "week": 4,
-            "biweekly": 2,
-            "bi-weekly": 2,
-            "bimonthly": 2,
-            "monthly": 1,
-            "month": 1,
-        }
+        # ------------------------------------
+        # Shipment-based details per ingredient
+        # ------------------------------------
+        st.sidebar.markdown("### 📦 Detailed Restock Insights")
 
-        def _freq_to_per_month(f):
-            if pd.isna(f):
-                return np.nan
-            fs = str(f).strip().lower()
-            for k, v in freq_map.items():
-                if k in fs:
-                    return v
-            # numeric fallback: if f is numeric treat as count per month
-            try:
-                return float(fs)
-            except Exception:
-                return np.nan
+        shipments.columns = [c.strip().lower().replace(" ", "_") for c in shipments.columns]
 
-        # Prepare latest usage map from monthly_totals for the selected last_month
-        last_month = months_in_data[-1]
-        if last_month not in monthly_totals["Month"].values:
-            # fallback: take last row of monthly_totals
-            current_vals = monthly_totals.iloc[-1][valid_cols]
-            shown_last_month = monthly_totals.iloc[-1]["Month"]
-        else:
-            current_vals = monthly_totals[monthly_totals["Month"] == last_month][valid_cols].iloc[0]
-            shown_last_month = last_month
+        for ing, pct in low_ingredients.items():
+            st.sidebar.markdown(f"#### 🧂 {ing}")
+            match = shipments[shipments["ingredient"].str.lower().str.contains(ing.lower(), na=False)]
 
-        # Build alerts list
-        alerts = []
-        # create set of valid ingredients for matching
-        valid_ings = list(valid_cols)
+            if not match.empty:
+                row = match.iloc[0]
+                freq = str(row.get("frequency", "Unknown")).capitalize()
+                qty = row.get("quantity_per_shipment", "Unknown")
+                unit = row.get("unit_of_shipment", "")
+                est_supply = row.get("estimated_weekly_supply", "Unknown")
+                total_recv = row.get("total_received", "Unknown")
 
-        for i, row in shipment_df.iterrows():
-            ing_raw = row[col_ing] if col_ing else None
-            if pd.isna(ing_raw):
-                continue
-            ing_raw = str(ing_raw).strip()
-            matched = _find_best_match(ing_raw, valid_ings)
-            total_received = None
-            # pull numbers safely
-            if col_total_received and col_total_received in row:
-                try:
-                    total_received = float(str(row[col_total_received]).replace(',', '').strip())
-                except Exception:
-                    total_received = np.nan
-            # fallback to Estimated Weekly Supply * 4 if no Total Received but estimated weekly exists
-            if (pd.isna(total_received) or total_received == 0) and col_est_week and col_est_week in row:
-                try:
-                    est_week = float(str(row[col_est_week]).replace(',', '').strip())
-                    total_received = est_week * 4  # approximate monthly intake
-                except Exception:
-                    pass
-            # If still NaN, skip for numeric calculations but still show info
-            if matched is None:
-                used = None
-            else:
-                used = float(current_vals.get(matched, 0))
-
-            freq_raw = row[col_freq] if col_freq else None
-            freq_monthly = _freq_to_per_month(freq_raw)
-
-            qty_per = row[col_qty_per] if col_qty_per else None
-            unit = row[col_unit] if col_unit else None
-            num_ship = row[col_num_ship] if col_num_ship else None
-
-            # compute percent used/remaining
-            pct_used = None
-            pct_remaining = None
-            timing = "Unknown"
-            if total_received and total_received > 0 and used is not None:
-                pct_used = (used / total_received) * 100
-                pct_remaining = max(0.0, 100.0 - pct_used)
-                # classify timing (more aggressive thresholds for urgent)
-                if pct_used >= 75:
-                    timing = "Week 4 (Urgent)"
-                elif pct_used >= 50:
-                    timing = "Week 3"
-                elif pct_used >= 25:
-                    timing = "Week 2"
+                # Interpret timing and alert intensity
+                if pct <= 10:
+                    urgency = "🚨 Critically low – immediate restock needed!"
+                    suggestion = "Contact supplier ASAP or pull from backup stock."
+                    week = "Final week of the month"
+                elif pct <= 20:
+                    urgency = "⚠️ Low supply detected."
+                    suggestion = "Restock during the third week to avoid shortages."
+                    week = "Third week of the month"
                 else:
-                    timing = "Sufficient (no immediate restock)"
-            # Build human readable recommendation
-            rec = ""
-            if pct_used is None:
-                rec = "No usage data available to compute recommendation."
+                    urgency = "⚠️ Below ideal threshold."
+                    suggestion = "Monitor daily and prepare restock order."
+                    week = "Second week of the month"
+
+                # Smart frequency note
+                if "biweek" in freq.lower():
+                    freq_note = "Delivered twice per month (every 2 weeks)."
+                elif "week" in freq.lower():
+                    freq_note = "Delivered weekly."
+                elif "month" in freq.lower():
+                    freq_note = "Delivered monthly."
+                else:
+                    freq_note = "Delivery schedule not specified."
+
+                # Rich bullet point summary
+                st.sidebar.markdown(f"""
+                • **Status:** {urgency}  
+                • **Frequency:** {freq_note}  
+                • **Quantity per shipment:** {qty} {unit}  
+                • **Total received per cycle:** {total_recv} {unit}  
+                • **Estimated weekly supply:** {est_supply}  
+                • **Stock level:** {pct:.1f}% of normal usage remaining  
+                • **Suggested restock timing:** {week}  
+                • **Action:** {suggestion}
+                """)
+
             else:
-                rec = dedent(f"""
-                    • Frequency: {freq_raw or 'unknown'} (~{freq_monthly if not pd.isna(freq_monthly) else '?'} shipments/month)
-                    • Quantity per shipment: {qty_per or 'unknown'} {unit or ''}
-                    • Number of shipments (period): {num_ship or 'unknown'}
-                    • Total received (shipment file): {total_received if not pd.isna(total_received) else 'unknown'}
-                    • Used this month ({shown_last_month}): {used:.1f}
-                    • Percent used: {pct_used:.1f}%
-                    • Percent remaining: {pct_remaining:.1f}%
-                    • Recommended timing: {timing}
-                    • Timestamp: {'third week of the month' if timing == 'Week 3' else ('fourth week' if timing.startswith('Week 4') else ('second week' if timing == 'Week 2' else 'start of month'))}
-                """).strip()
+                st.sidebar.markdown(f"""
+                • No shipment data found for **{ing}**.  
+                • Review manually and verify supplier frequency.  
+                • Recommended: Add entry to `shipmentfile.csv` for tracking.
+                """)
 
-            alerts.append({
-                "ingredient_raw": ing_raw,
-                "matched_ing": matched,
-                "pct_used": pct_used,
-                "pct_remaining": pct_remaining,
-                "rec_text": rec
-            })
+        st.sidebar.markdown("---")
+        st.sidebar.caption("🔄 Data synced from shipmentfile.csv and monthly usage patterns.")
 
-        # Filter to items that appear to be low-ish (used >= 50% OR explicitly in previously computed low_ingredients)
-        compiled = []
-        # create quick lookup set for previously low ingredients by name (case-insensitive)
-        low_set = set([i.lower() for i in low_ingredients.index]) if 'low_ingredients' in locals() else set()
-        for a in alerts:
-            add_flag = False
-            if a["pct_used"] is not None:
-                if a["pct_used"] >= 50:  # used half or more -> consider restock suggestion
-                    add_flag = True
-            # also include if matched ingredient was flagged earlier as low (<=25% remaining)
-            if a["matched_ing"] and a["matched_ing"].lower() in low_set:
-                add_flag = True
-            if add_flag:
-                compiled.append(a)
-
-        if len(compiled) == 0:
-            st.sidebar.success("✅ Shipment checks: no strong restock recommendations right now.")
-        else:
-            st.sidebar.markdown("**Every two weeks, consider restocking the following (based on shipments & monthly usage):**")
-            for a in compiled:
-                title = a["matched_ing"] if a["matched_ing"] else a["ingredient_raw"]
-                st.sidebar.markdown(f"**🔸 {title}**")
-                # print recommendation bullet points
-                for line in a["rec_text"].split("\n"):
-                    st.sidebar.markdown(f"- {line}")
-                st.sidebar.markdown("")  # small spacer
 
 
 
