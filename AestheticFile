@@ -9,6 +9,7 @@ import calendar
 
 st.set_page_config(page_title="Mai Shan Yun Data Analysis", layout="wide")
 
+
 st.markdown(
     """
     <style>
@@ -28,7 +29,7 @@ st.markdown(
 )
 
 
-st.title("Mai Shan Yun Data Analysis 🥡📈")
+st.title("Mai Shan Yun Data Analysis")
 
 # ------------------------------
 # 1) LOAD CSVs
@@ -120,7 +121,7 @@ if len(valid_cols) > 0:
 # ------------------------------
 # 9) SIMPLE LINEAR PROJECTIONS (NEXT 3 MONTHS)
 # ------------------------------
-st.subheader("Predicted Ingredient Usage for Next 3 Months 🔮")
+st.subheader("Predicted Ingredient Usage for Next 3 Months")
 if len(valid_cols) == 0:
     st.info("No valid ingredient columns to predict. Add recipe mappings for unmatched items to enable predictions.")
 else:
@@ -148,65 +149,86 @@ else:
 ##
 
 # ----------------------------------------------------------
-# TOP DISHES BAR CHART (clean formatting + flexible controls)
+# TOP DISHES BAR CHART (single, corrected block)
 # ----------------------------------------------------------
-import textwrap
+st.subheader("Top Dishes This Month")
 
-st.subheader("Top Dishes This Month 🏆")
-
-# make sure numeric
+# ensure numeric
 orders["Count"] = pd.to_numeric(orders["Count"], errors="coerce").fillna(0)
-if "Amount" in orders.columns:
-    orders["Amount"] = pd.to_numeric(orders["Amount"], errors="coerce").fillna(0)
-else:
-    orders["Amount"] = 0.0
 
-# months present in your orders, preserving your calendar order
-available_months = [m for m in months_in_data if (orders["Month"] == m).any()]
-default_idx = max(len(available_months) - 1, 0)  # default to latest available
+# Create a clean "Sales Amount" from the CSV's "Amount"
+if "Amount" in orders.columns:
+    orders["Sales Amount"] = pd.to_numeric(orders["Amount"], errors="coerce").fillna(0.0)
+else:
+    orders["Sales Amount"] = 0.0
+
+# months present in your orders, preserving calendar order
+available_months = [m for m in months_in_data if "Month" in orders.columns and (orders["Month"] == m).any()]
+default_idx = max(len(available_months) - 1, 0)
 
 c1, c2, c3 = st.columns([1.1, 1, 1])
 with c1:
     sel_month = st.radio("Select Month", options=available_months or months_in_data, index=default_idx)
 with c2:
-    metric = st.selectbox("Metric", ["Count", "Amount"], index=0)
+    metric_label = st.selectbox("Metric", ["Count", "Sales Amount"], index=0)
 with c3:
     top_n = st.slider("Top N", min_value=5, max_value=20, value=10, step=1)
 
-month_df = orders.loc[orders["Month"] == sel_month, ["Item Name", "Count", "Amount"]].copy()
+metric_col = "Count" if metric_label == "Count" else "Sales Amount"
+
+month_df = orders.loc[orders["Month"] == sel_month, ["Item Name", "Count", "Sales Amount"]].copy()
 
 if month_df.empty:
     st.info(f"No rows found for {sel_month}.")
 else:
-    # aggregate, sort, take top N
-    agg = month_df.groupby("Item Name", as_index=False)[metric].sum()
-    agg = agg.sort_values(metric, ascending=False).head(top_n).reset_index(drop=True)
+    agg = month_df.groupby("Item Name", as_index=False)[metric_col].sum()
+    agg = agg.sort_values(metric_col, ascending=False).head(top_n).reset_index(drop=True)
 
-    # wrap long labels so they don’t collide
+    import textwrap
     agg["Label"] = agg["Item Name"].apply(lambda s: textwrap.fill(str(s), width=16))
 
-    title_metric = "Orders" if metric == "Count" else "Sales ($)"
+    title_metric = "Orders" if metric_col == "Count" else "Sales Amount ($)"
     fig_top = px.bar(
         agg,
         x="Label",
-        y=metric,
+        y=metric_col,
         text_auto=True,
-        title=f"Top {len(agg)} Dishes in {sel_month} by {title_metric}",
         color_discrete_sequence=["#5bc0de"]
     )
+
+    # Visibility: solid black text, centered/larger title, clear background
     fig_top.update_layout(
+        title=dict(
+            text=f"Top {len(agg)} Dishes in {sel_month} by {title_metric} 📊",
+            x=0.5, xanchor="center",
+            font=dict(size=26, color="black")
+        ),
+        font=dict(color="black", size=14),
         xaxis_title="Dishes",
         yaxis_title=title_metric,
         xaxis_tickangle=-30,
-        title_x=0.5,
         bargap=0.25,
-        margin=dict(l=40, r=20, t=60, b=80),
+        margin=dict(l=40, r=20, t=80, b=80),
+        paper_bgcolor="white",
         plot_bgcolor="white",
     )
-    # show values outside bars; allow labels beyond axes
-    fig_top.update_traces(textposition="outside", cliponaxis=False)
-    # nicer y-axis
-    fig_top.update_yaxes(separatethousands=True, showgrid=True, gridcolor="rgba(0,0,0,0.1)")
+    fig_top.update_xaxes(
+        tickfont=dict(color="black", size=12),
+        title_font=dict(color="black", size=16),
+        showline=True, linecolor="black",
+        showgrid=True, gridcolor="lightgray"
+    )
+    fig_top.update_yaxes(
+        tickfont=dict(color="black", size=12),
+        title_font=dict(color="black", size=16),
+        showline=True, linecolor="black",
+        showgrid=True, gridcolor="lightgray",
+        separatethousands=True
+    )
+    if metric_col == "Sales Amount":
+        fig_top.update_yaxes(tickprefix="$")
+
+    fig_top.update_traces(textfont=dict(color="black", size=13), textposition="outside", cliponaxis=False)
 
     st.plotly_chart(fig_top, use_container_width=True)
 
@@ -214,34 +236,102 @@ else:
 
 
 # ------------------------------
-# 10) SIDEBAR: INGREDIENTS RUNNING LOW
+# 10) SIDEBAR: INGREDIENTS RUNNING LOW + DETAILED RESTOCK RECOMMENDATIONS
 # ------------------------------
+import datetime
 st.sidebar.header("⚠️ Ingredients Running Low")
+
+# Timestamp of check
+today = datetime.datetime.now()
+st.sidebar.markdown(f"📅 **Status checked:** {today.strftime('%B %d, %Y')}")
 
 if len(valid_cols) == 0:
     st.sidebar.info("No valid ingredients available to check.")
 else:
-    # Pick the last month (October in your dataset)
     last_month = months_in_data[-1]
     current_data = monthly_totals[monthly_totals["Month"] == last_month]
 
-    # Compute max per ingredient across all months
     max_per_ing = monthly_totals[valid_cols].max()
     current_vals = current_data[valid_cols].iloc[0]
-
-    # Calculate percentage remaining
     percent_remaining = (current_vals / max_per_ing) * 100
-    low_ingredients = percent_remaining[percent_remaining <= 25]  # ≤ 25% of max
+    low_ingredients = percent_remaining[percent_remaining <= 25]
 
     if low_ingredients.empty:
         st.sidebar.success("✅ No ingredients currently running low!")
     else:
         st.sidebar.warning(f"{len(low_ingredients)} ingredients running low.")
         
-        # Horizontal bar plot for low ingredients
+        # Bar chart
         fig_low, ax_low = plt.subplots(figsize=(5, len(low_ingredients) * 0.4))
         ax_low.barh(low_ingredients.index, low_ingredients.values, color="salmon")
         ax_low.set_xlabel("% Remaining")
         ax_low.set_title(f"Ingredients Running Low - {last_month}")
         plt.tight_layout()
         st.sidebar.pyplot(fig_low)
+
+        # ------------------------------------
+        # Shipment-based details per ingredient
+        # ------------------------------------
+        st.sidebar.markdown("### 📦 Detailed Restock Insights")
+
+        shipments.columns = [c.strip().lower().replace(" ", "_") for c in shipments.columns]
+
+        for ing, pct in low_ingredients.items():
+            st.sidebar.markdown(f"#### 🧂 {ing}")
+            match = shipments[shipments["ingredient"].str.lower().str.contains(ing.lower(), na=False)]
+
+            if not match.empty:
+                row = match.iloc[0]
+                freq = str(row.get("frequency", "Unknown")).capitalize()
+                qty = row.get("quantity_per_shipment", "Unknown")
+                unit = row.get("unit_of_shipment", "")
+                est_supply = row.get("estimated_weekly_supply", "Unknown")
+                total_recv = row.get("total_received", "Unknown")
+
+                # Interpret timing and alert intensity
+                if pct <= 10:
+                    urgency = "🚨 Critically low – immediate restock needed!"
+                    suggestion = "Contact supplier ASAP or pull from backup stock."
+                    week = "Final week of the month"
+                elif pct <= 20:
+                    urgency = "⚠️ Low supply detected."
+                    suggestion = "Restock during the third week to avoid shortages."
+                    week = "Third week of the month"
+                else:
+                    urgency = "⚠️ Below ideal threshold."
+                    suggestion = "Monitor daily and prepare restock order."
+                    week = "Second week of the month"
+
+                # Smart frequency note
+                if "biweek" in freq.lower():
+                    freq_note = "Delivered twice per month (every 2 weeks)."
+                elif "week" in freq.lower():
+                    freq_note = "Delivered weekly."
+                elif "month" in freq.lower():
+                    freq_note = "Delivered monthly."
+                else:
+                    freq_note = "Delivery schedule not specified."
+
+                # Rich bullet point summary
+                st.sidebar.markdown(f"""
+                • **Status:** {urgency}  
+                • **Frequency:** {freq_note}  
+                • **Quantity per shipment:** {qty} {unit}  
+                • **Total received per cycle:** {total_recv} {unit}  
+                • **Estimated weekly supply:** {est_supply}  
+                • **Stock level:** {pct:.1f}% of normal usage remaining  
+                • **Suggested restock timing:** {week}  
+                • **Action:** {suggestion}
+                """)
+
+            else:
+                st.sidebar.markdown(f"""
+                • No shipment data found for **{ing}**.  
+                • Review manually and verify supplier frequency.  
+                • Recommended: Add entry to `shipmentfile.csv` for tracking.
+                """)
+
+        st.sidebar.markdown("---")
+        st.sidebar.caption("🔄 Data synced from shipmentfile.csv and monthly usage patterns.")
+
+        
