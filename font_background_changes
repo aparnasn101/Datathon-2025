@@ -1,6 +1,7 @@
 # ------------------------------
 # 0) AESTHETIC STYLING
 # ------------------------------
+
 st.markdown(
     """
     <style>
@@ -24,10 +25,16 @@ st.markdown(
       }
 
       /* Sidebar background */
-      .sidebar .sidebar-content {
-          background-color: #d4f1f9;  /* pastel blue */
+      [data-testid="stSidebar"] {
+          background-color: #cce7ff !important;  /* pastel blue */
           color: black;
-          font-family: Georgia, serif;
+          font-family: Georgia, serif !important;
+      }
+
+      /* Sidebar text color */
+      [data-testid="stSidebar"] * {
+          color: black !important;
+          font-family: Georgia, serif !important;
       }
 
       /* Tables styling */
@@ -74,4 +81,9 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+# Sidebar headers (no emojis)
+st.sidebar.header("Ingredients Running Low")
+st.sidebar.header("Monthly Shipment Reviews")
+
 
