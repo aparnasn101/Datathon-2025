@@ -1,0 +1,15 @@
+﻿Ingredient,Quantity per shipment,Unit of shipment,Number of shipments,frequency,Total Received,Estimated Weekly Supply
+Beef,40,lbs,3,weekly,120,120
+Chicken,40,lbs,2,weekly,80,80
+Ramen,50,rolls,15,biweekly,750,375
+Rice Noodles,50,lbs,2,monthly,100,25
+Flour,50,lbs,2,monthly,100,25
+Tapioca Starch,25,lbs,1,monthly,25,6.25
+Rice,50,lbs,2,Biweekly,100,50
+Green Onion,20,lbs,2,weekly,40,40
+White Onion,80,whole onion,4,weekly,320,320
+Cilantro,5,lbs,2,weekly,10,10
+Egg,120,eggs,5,weekly,600,600
+Peas + Carrot,40,lbs,3,weekly,120,120
+Bokchoy,25,lbs,5,weekly,125,125
+Chicken Wings,380,pieces,10,weekly,3800,3800
