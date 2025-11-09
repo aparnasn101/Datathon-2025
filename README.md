@@ -81,7 +81,7 @@ Make sure these files are placed in the same directory as `app.py`, `app2.py`, a
 
 git clone https://github.com/aparnasn101/Datathon-2025.git
 cd Datathon-2025
-pip install -r requirements.txt
+pip install streamlit pandas numpy matplotlib plotly scikit-learn
 
 Then open the URL in your browser.
 
