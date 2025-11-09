@@ -154,13 +154,36 @@ else:
 st.subheader("Top Dishes This Month")
 
 # ensure numeric
-orders["Count"] = pd.to_numeric(orders["Count"], errors="coerce").fillna(0)
+# ---- Normalize Count + build a real numeric "Sales Amount" ----
+orders["Count"] = pd.to_numeric(orders.get("Count"), errors="coerce").fillna(0)
 
-# Create a clean "Sales Amount" from the CSV's "Amount"
+def clean_money(series: pd.Series) -> pd.Series:
+    # Handles $ signs, commas, unicode minus, and (123.45) -> -123.45
+    return pd.to_numeric(
+        series.astype(str)
+              .str.replace(r"[\$,]", "", regex=True)
+              .str.replace("−", "-", regex=False)
+              .str.replace(r"^\((.*)\)$", r"-\1", regex=True)
+              .str.strip(),
+        errors="coerce"
+    ).fillna(0.0)
+
+# Prefer an exact 'Amount' column; otherwise auto-detect a sales-like column
 if "Amount" in orders.columns:
-    orders["Sales Amount"] = pd.to_numeric(orders["Amount"], errors="coerce").fillna(0.0)
+    orders["Sales Amount"] = clean_money(orders["Amount"])
 else:
-    orders["Sales Amount"] = 0.0
+    candidates = [c for c in orders.columns if any(k in c.lower() for k in ["sales", "amount", "revenue", "total"])]
+    if candidates:
+        # pick the column with the biggest numeric sum
+        best = max(candidates, key=lambda c: clean_money(orders[c]).sum())
+        orders["Sales Amount"] = clean_money(orders[best])
+    else:
+        orders["Sales Amount"] = 0.0
+
+# (optional) tiny sanity check you can remove later
+totals = orders.groupby("Month", observed=True)["Sales Amount"].sum()
+st.caption("Sales totals by month: " + ", ".join(f"{m}: ${v:,.2f}" for m, v in totals.items()))
+
 
 # months present in your orders, preserving calendar order
 available_months = [m for m in months_in_data if "Month" in orders.columns and (orders["Month"] == m).any()]
@@ -241,83 +264,145 @@ else:
 import datetime
 st.sidebar.header("⚠️ Ingredients Running Low")
 
-import datetime
-
-st.sidebar.header("⚠️ Ingredients Running Low + Monthly Review")
-
 # Timestamp of check
 today = datetime.datetime.now()
 st.sidebar.markdown(f"📅 **Status checked:** {today.strftime('%B %d, %Y')}")
 
-# Dropdown to select month
-selected_month = st.sidebar.selectbox("Select Month for Detailed Review", months_in_data)
-
-# Get monthly usage for selected month
-month_data = monthly_totals[monthly_totals["Month"] == selected_month]
-if month_data.empty:
-    st.sidebar.info(f"No data available for {selected_month}.")
+if len(valid_cols) == 0:
+    st.sidebar.info("No valid ingredients available to check.")
 else:
-    st.sidebar.markdown(f"### 📦 Monthly Review: {selected_month}")
+    last_month = months_in_data[-1]
+    current_data = monthly_totals[monthly_totals["Month"] == last_month]
 
-    for ing in valid_cols:
-        # Current percentage remaining vs max
-        max_val = monthly_totals[ing].max()
-        current_val = month_data[ing].iloc[0]
-        pct = (current_val / max_val) * 100 if max_val > 0 else 0
+    max_per_ing = monthly_totals[valid_cols].max()
+    current_vals = current_data[valid_cols].iloc[0]
+    percent_remaining = (current_vals / max_per_ing) * 100
+    low_ingredients = percent_remaining[percent_remaining <= 25]
 
-        st.sidebar.markdown(f"#### 🧂 {ing}")
-        match = shipments[shipments["ingredient"].str.lower().str.contains(ing.lower(), na=False)]
+    if low_ingredients.empty:
+        st.sidebar.success("✅ No ingredients currently running low!")
+    else:
+        st.sidebar.warning(f"{len(low_ingredients)} ingredients running low.")
+        
+        # Bar chart
+        fig_low, ax_low = plt.subplots(figsize=(5, len(low_ingredients) * 0.4))
+        ax_low.barh(low_ingredients.index, low_ingredients.values, color="salmon")
+        ax_low.set_xlabel("% Remaining")
+        ax_low.set_title(f"Ingredients Running Low - {last_month}")
+        plt.tight_layout()
+        st.sidebar.pyplot(fig_low)
 
-        if not match.empty:
-            row = match.iloc[0]
-            freq = str(row.get("frequency", "Unknown")).capitalize()
-            qty = row.get("quantity_per_shipment", "Unknown")
-            unit = row.get("unit_of_shipment", "")
-            est_supply = row.get("estimated_weekly_supply", "Unknown")
-            total_recv = row.get("total_received", "Unknown")
+        # ------------------------------------
+        # Shipment-based details per ingredient
+        # ------------------------------------
+        st.sidebar.markdown("### 📦 Detailed Restock Insights")
 
-            # Timing notes for bullet points
-            if pct <= 10:
-                urgency = "🚨 Critically low – immediate restock needed!"
-                suggestion = "Contact supplier ASAP or pull from backup stock."
-                week = "Final week of the month"
-            elif pct <= 20:
-                urgency = "⚠️ Low supply detected."
-                suggestion = "Restock during the third week to avoid shortages."
-                week = "Third week of the month"
+        shipments.columns = [c.strip().lower().replace(" ", "_") for c in shipments.columns]
+
+        for ing, pct in low_ingredients.items():
+            st.sidebar.markdown(f"#### 🧂 {ing}")
+            match = shipments[shipments["ingredient"].str.lower().str.contains(ing.lower(), na=False)]
+
+            if not match.empty:
+                row = match.iloc[0]
+                freq = str(row.get("frequency", "Unknown")).capitalize()
+                qty = row.get("quantity_per_shipment", "Unknown")
+                unit = row.get("unit_of_shipment", "")
+                est_supply = row.get("estimated_weekly_supply", "Unknown")
+                total_recv = row.get("total_received", "Unknown")
+
+                # Interpret timing and alert intensity
+                if pct <= 10:
+                    urgency = "🚨 Critically low – immediate restock needed!"
+                    suggestion = "Contact supplier ASAP or pull from backup stock."
+                    week = "Final week of the month"
+                elif pct <= 20:
+                    urgency = "⚠️ Low supply detected."
+                    suggestion = "Restock during the third week to avoid shortages."
+                    week = "Third week of the month"
+                else:
+                    urgency = "⚠️ Below ideal threshold."
+                    suggestion = "Monitor daily and prepare restock order."
+                    week = "Second week of the month"
+
+                # Smart frequency note
+                if "biweek" in freq.lower():
+                    freq_note = "Delivered twice per month (every 2 weeks)."
+                elif "week" in freq.lower():
+                    freq_note = "Delivered weekly."
+                elif "month" in freq.lower():
+                    freq_note = "Delivered monthly."
+                else:
+                    freq_note = "Delivery schedule not specified."
+
+                # Rich bullet point summary
+                st.sidebar.markdown(f"""
+                • **Status:** {urgency}  
+                • **Frequency:** {freq_note}  
+                • **Quantity per shipment:** {qty} {unit}  
+                • **Total received per cycle:** {total_recv} {unit}  
+                • **Estimated weekly supply:** {est_supply}  
+                • **Stock level:** {pct:.1f}% of normal usage remaining  
+                • **Suggested restock timing:** {week}  
+                • **Action:** {suggestion}
+                """)
+
             else:
-                urgency = "⚠️ Below ideal threshold."
-                suggestion = "Monitor daily and prepare restock order."
-                week = "Second week of the month"
+                st.sidebar.markdown(f"""
+                • No shipment data found for **{ing}**.  
+                • Review manually and verify supplier frequency.  
+                • Recommended: Add entry to `shipmentfile.csv` for tracking.
+                """)
 
-            if "biweek" in freq.lower():
-                freq_note = "Delivered twice per month (every 2 weeks)."
-            elif "week" in freq.lower():
-                freq_note = "Delivered weekly."
-            elif "month" in freq.lower():
-                freq_note = "Delivered monthly."
-            else:
-                freq_note = "Delivery schedule not specified."
+        st.sidebar.markdown("---")
+        st.sidebar.caption("🔄 Data synced from shipmentfile.csv and monthly usage patterns.")
 
-            # Display bullet points
-            st.sidebar.markdown(f"""
-            • **Status:** {urgency}  
-            • **Frequency:** {freq_note}  
-            • **Quantity per shipment:** {qty} {unit}  
-            • **Total received per cycle:** {total_recv} {unit}  
-            • **Estimated weekly supply:** {est_supply}  
-            • **Stock level:** {pct:.1f}% of normal usage remaining  
-            • **Suggested restock timing:** {week}  
-            • **Action:** {suggestion}
-            """)
+        # ------------------------------
+# 11) SIDEBAR: MONTHLY REVIEWS (May–October)
+# ------------------------------
+st.sidebar.header("📅 Monthly Shipment Reviews")
+
+# Normalize column names
+shipments.columns = [c.strip().lower().replace(" ", "_") for c in shipments.columns]
+
+months = ["May", "June", "July", "August", "September", "October"]
+
+for month in months:
+    st.sidebar.subheader(f"Monthly Review: {month}")
+    st.sidebar.markdown(f"**Start Date:** {month} 1, 2025")
+    
+    # Loop through all ingredients in shipment file
+    for _, row in shipments.iterrows():
+        ingredient = row.get("ingredient", "Unknown Ingredient")
+        freq = str(row.get("frequency", "Unknown")).capitalize()
+        qty = row.get("quantity_per_shipment", "N/A")
+        unit = row.get("unit_of_shipment", "")
+        est_supply = row.get("estimated_weekly_supply", "N/A")
+        total_recv = row.get("total_received", "N/A")
+        
+        # Calculate next restock based on frequency
+        start_date = pd.to_datetime(f"2025-{month}-01", errors="coerce")
+        if "week" in freq.lower():
+            interval = 7
+        elif "biweek" in freq.lower():
+            interval = 14
+        elif "month" in freq.lower():
+            interval = 30
         else:
-            st.sidebar.markdown(f"""
-            • No shipment data found for **{ing}**.  
-            • Review manually and verify supplier frequency.  
-            • Recommended: Add entry to `shipmentfile.csv` for tracking.
-            """)
+            interval = 14  # fallback
 
+        next_restock = start_date + pd.Timedelta(days=interval)
+        next_restock_str = next_restock.strftime("%B %d, %Y")
+        
+        # Bullet point summary per ingredient
+        st.sidebar.markdown(f"""
+        • **{ingredient}**  
+            - Restocked: {freq}  
+            - Next restock due: {next_restock_str}  
+            - Quantity per shipment: {qty} {unit}  
+            - Estimated weekly supply: {est_supply}  
+            - Total received this cycle: {total_recv}
+        """)
+    
     st.sidebar.markdown("---")
-    st.sidebar.caption("🔄 Data synced from shipmentfile.csv and monthly usage patterns.")
-
 
