@@ -461,18 +461,18 @@ October,Fried Chicken,939,10965.23
 October,Fruit Tea,105,460.01
 October,Fried Rice,492,6911.21
 October,Additonal,198,508.54
-October,Appetizer,1241,7416.47
+October,Appetizer,"1,241",7416.47
 October,Dessert,31,153.64
 October,Lunch Special,366,5149.01
 October,Milk Tea,555,2527.77
 October,Special Offer,115,1344.64
 October,Wonton,213,2406.52
-October,Drink,2996,1820.99
+October,Drink,"2,996",1820.99
 October,Open Food,2,9.31
 October,Bingsu,12,60.52
 October,Combo Items,0,0
 October,Jas-Lemonade,104,461.33
-October,Rice Noodle,410,"6,167.13"
+October,Rice Noodle,410,6167.13
 October,Mai Dessert,33,184.81
 September,Beef Ramen,362,5626.37
 September,Lunch Special,398,5606.57
@@ -578,4 +578,6 @@ September,Mai‘s Special Sauce,1,1
 September,Water,2320,0
 September,Sliced Fruit  - 5 day expiration,1,0
 September,House Tossed Rice Noodle,1,15.99
-
+,,,
+,,,
+,,38537,
