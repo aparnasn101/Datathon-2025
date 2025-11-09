@@ -1,0 +1,53 @@
+st.markdown(
+    """
+    <style>
+      /* Main app background and text */
+      .stApp { 
+          background-color: #fdf6f0;  /* soft pastel cream */
+          color: black;               
+          font-family: Georgia, serif; 
+      }
+
+      /* Force black text and Georgia font across all components */
+      html, body, [class*="css"] {
+          color: black !important;
+          font-family: Georgia, serif !important;
+      }
+
+      /* Headings styling */
+      h1, h2, h3, h4, h5, h6 {
+          color: #333333 !important;  
+          font-family: Georgia, serif !important;
+      }
+
+      /* Sidebar background */
+      .sidebar .sidebar-content {
+          background-color: #fff7f2;  /* pastel pinkish cream */
+      }
+
+      /* Tables styling */
+      .stDataFrame table {
+          background-color: #fff8f3;
+          color: black;
+      }
+
+      /* Markdown text in app and sidebar */
+      p, div, span, label {
+          color: black !important;
+          font-family: Georgia, serif !important;
+      }
+
+      /* Plotly chart background */
+      .js-plotly-plot {
+          background-color: #fdf6f0 !important;
+      }
+
+      /* Optional: bar chart colors and font sizes */
+      .plotly .bar text {
+          font-family: Georgia, serif !important;
+          color: black !important;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
