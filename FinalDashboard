@@ -1,0 +1,509 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from sklearn.linear_model import LinearRegression
+import calendar
+
+# ------------------------------
+# 0) AESTHETIC STYLING
+# ------------------------------
+
+st.markdown(
+    """
+    <style>
+      /* Main app background and text */
+      .stApp { 
+          background-color: #fdf6f0;  /* soft pastel cream */
+          color: black;               
+          font-family: Georgia, serif; 
+      }
+
+      /* Force black text and Georgia font across all components */
+      html, body, [class*="css"] {
+          color: black !important;
+          font-family: Georgia, serif !important;
+      }
+
+      /* Headings styling */
+      h1, h2, h3, h4, h5, h6 {
+          color: #333333 !important;  
+          font-family: Georgia, serif !important;
+      }
+
+      /* Sidebar background */
+      [data-testid="stSidebar"] {
+          background-color: #cce7ff !important;  /* pastel blue */
+          color: black;
+          font-family: Georgia, serif !important;
+      }
+
+      /* Sidebar text color */
+      [data-testid="stSidebar"] * {
+          color: black !important;
+          font-family: Georgia, serif !important;
+      }
+
+      /* Tables styling */
+      .stDataFrame table {
+          background-color: #fff8f3;
+          color: black;
+          font-family: Georgia, serif;
+      }
+
+      /* Markdown text in app and sidebar */
+      p, div, span, label {
+          color: black !important;
+          font-family: Georgia, serif !important;
+      }
+
+      /* Horizontal divider styling for sections */
+      hr {
+          border: 0;
+          height: 1px;
+          background-color: #cfcfcf;
+          margin-top: 20px;
+          margin-bottom: 20px;
+      }
+
+      /* Plotly chart background and font */
+      .js-plotly-plot {
+          background-color: #fdf6f0 !important;
+          font-family: Georgia, serif !important;
+          color: black !important;
+      }
+
+      /* Plotly axis titles and labels */
+      .plotly .xtick text, .plotly .ytick text, .plotly .axis-title {
+          font-family: Georgia, serif !important;
+          color: black !important;
+      }
+
+      /* Optional: bar chart text */
+      .plotly .bar text {
+          font-family: Georgia, serif !important;
+          color: black !important;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Sidebar headers (no emojis)
+st.sidebar.header("Ingredients Running Low")
+st.sidebar.header("Monthly Shipment Reviews")
+
+st.set_page_config(page_title="Mai Shan Yun Data Analysis", layout="wide")
+
+
+st.image("maishanyun.png", width=500)
+st.set_page_config(page_title="Mai Shan Yun Data Analysis", layout="wide")
+st.title("Mai Shan Yun Data Analysis")
+st.markdown("Welcome to Mai Shan Yun! Using restaurant data from the past six months," \
+" we were able to create multiple charts to help analyze ingredient usage, inventory stock, and the popularity of " \
+"each dish. We hope this information will be able to help help identify trends and improve restaurant performance!")
+
+
+
+
+
+st.image("foodline1.png", use_container_width=True)
+
+
+st.markdown(
+    """
+    <style>
+      .stApp { 
+          background-color: #f3e8ff;   /* light purple background */
+          color: black;                /* default text color */
+      }
+      html, body, [class*="css"] {
+          color: black !important;     /* force black text across all components */
+      }
+      h1, h2, h3, h4, h5, h6, p, div, span, label {
+          color: black !important;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# ------------------------------
+# 1) LOAD CSVs
+# ------------------------------
+orders = pd.read_csv("Restaurant Data.csv", thousands=',')
+ingredients = pd.read_csv("IngredientsUsed.csv", thousands=',')
+shipments = pd.read_csv("MSY Data - Shipment.csv")  # not used yet, but loaded
+
+# Explicit month order
+months_in_data = ["May", "June", "July", "August", "September", "October"]
+orders["Month"] = pd.Categorical(orders["Month"], categories=months_in_data, ordered=True)
+
+# ------------------------------
+# 3) MERGE ORDERS WITH INGREDIENT RECIPES
+#    (LEFT JOIN so October stays even if items don't match)
+# ------------------------------
+if "Item Name" not in orders.columns:
+    st.error("Orders missing 'Item Name'. Columns: " + ", ".join(orders.columns))
+if "Item Name" not in ingredients.columns:
+    st.error("Ingredients missing 'Item Name'. Columns: " + ", ".join(ingredients.columns))
+
+usage = orders.merge(ingredients, on="Item Name", how="left", indicator=True)
+
+# Ingredient columns are everything from ingredients except the key
+ingredient_cols = [c for c in ingredients.columns if c != "Item Name"]
+
+
+# ------------------------------
+# 5) BUILD INGREDIENT USAGE
+# ------------------------------
+# Coerce each ingredient column to numeric and multiply by dish count
+for col in ingredient_cols:
+    usage[col] = pd.to_numeric(usage[col], errors="coerce").fillna(0)
+    usage[col] = usage[col] * usage["Count"]
+
+# Monthly totals across all ingredients
+monthly_totals = usage.groupby("Month", as_index=False)[ingredient_cols].sum()
+
+# OPTIONAL: Drop columns that are all zeros across all months (keeps visuals cleaner)
+drop_zero_only = True
+if drop_zero_only:
+    monthly_totals = monthly_totals.loc[:, (monthly_totals != 0).any(axis=0)]
+
+# After dropping zero-only columns, recompute the list we will use everywhere
+valid_cols = [c for c in ingredient_cols if c in monthly_totals.columns]
+
+# ------------------------------
+# 6) SHOW TABLE: INGREDIENTS USED PER MONTH
+# ------------------------------
+st.subheader("Ingredients Used per Month")
+if len(valid_cols) == 0:
+    st.warning("No ingredient columns with non-zero totals. Likely because many items (esp. October) use category names with no recipe match. Add recipes or a mapping for those items.")
+else:
+    st.dataframe(monthly_totals)
+
+# ------------------------------
+# 7) HEATMAP: ABSOLUTE USAGE
+# ------------------------------
+if len(valid_cols) > 0:
+    heatmap_data = monthly_totals.set_index("Month")[valid_cols]
+    fig = px.imshow(
+        heatmap_data.T,
+        labels=dict(x="Month", y="Ingredient", color="Usage"),
+        title="Ingredient Usage Heatmap ",
+        aspect="auto"
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+# ------------------------------
+# 8) HEATMAP: PERCENT DISTRIBUTION ACROSS MONTHS
+# ------------------------------
+if len(valid_cols) > 0:
+    ingredient_pct = monthly_totals.copy()
+    # Avoid divide-by-zero: if a column sums to zero, keep it zero
+    sums = ingredient_pct[valid_cols].sum(axis=0).replace({0: np.nan})
+    ingredient_pct[valid_cols] = ingredient_pct[valid_cols].div(sums, axis=1) * 100
+    ingredient_pct[valid_cols] = ingredient_pct[valid_cols].fillna(0)
+
+    heatmap_pct = ingredient_pct.set_index("Month")[valid_cols]
+    fig2 = px.imshow(
+        heatmap_pct.T,
+        labels=dict(x="Month", y="Ingredient", color="% of Total Usage"),
+        title="Ingredient Usage Spread Across Months",
+        aspect="auto",
+        text_auto=True
+    )
+    st.plotly_chart(fig2, use_container_width=True)
+
+# ------------------------------
+# 9) SIMPLE LINEAR PROJECTIONS (NEXT 3 MONTHS)
+# ------------------------------
+st.subheader("Predicted Ingredient Usage for Next 3 Months")
+if len(valid_cols) == 0:
+    st.info("No valid ingredient columns to predict. Add recipe mappings for unmatched items to enable predictions.")
+else:
+    # Build a 3-row frame (future months) and fill each ingredient as a column
+    future_index = ["Next Month 1", "Next Month 2", "Next Month 3"]  # 3 rows
+    predictions = pd.DataFrame(index=future_index, columns=valid_cols, dtype=float)  # columns = ingredients
+
+    # Use month index positions 0..N-1 for regression
+    X = np.arange(len(monthly_totals)).reshape(-1, 1)
+
+    for col in valid_cols:
+        y = monthly_totals[col].values
+        # If y is all zeros, the model is degenerate; keep zeros
+        if np.allclose(y, 0):
+            pred = np.array([0.0, 0.0, 0.0])
+        else:
+            model = LinearRegression()
+            model.fit(X, y)
+            X_future = np.arange(len(monthly_totals), len(monthly_totals) + 3).reshape(-1, 1)
+            pred = np.round(model.predict(X_future), 1)
+        predictions[col] = pred  # assign 3 values to the 3-row frame
+
+    st.dataframe(predictions.T)  # rows = ingredients, cols = future months
+
+##
+
+# ----------------------------------------------------------
+# TOP DISHES BAR CHART (single, corrected block)
+# ----------------------------------------------------------
+st.subheader("Top Dishes This Month")
+
+# ensure numeric
+# ---- Normalize Count + build a real numeric "Sales Amount" ----
+orders["Count"] = pd.to_numeric(orders.get("Count"), errors="coerce").fillna(0)
+
+def clean_money(series: pd.Series) -> pd.Series:
+    # Handles $ signs, commas, unicode minus, and (123.45) -> -123.45
+    return pd.to_numeric(
+        series.astype(str)
+              .str.replace(r"[\$,]", "", regex=True)
+              .str.replace("−", "-", regex=False)
+              .str.replace(r"^\((.*)\)$", r"-\1", regex=True)
+              .str.strip(),
+        errors="coerce"
+    ).fillna(0.0)
+
+# Prefer an exact 'Amount' column; otherwise auto-detect a sales-like column
+if "Amount" in orders.columns:
+    orders["Sales Amount"] = clean_money(orders["Amount"])
+else:
+    candidates = [c for c in orders.columns if any(k in c.lower() for k in ["sales", "amount", "revenue", "total"])]
+    if candidates:
+        # pick the column with the biggest numeric sum
+        best = max(candidates, key=lambda c: clean_money(orders[c]).sum())
+        orders["Sales Amount"] = clean_money(orders[best])
+    else:
+        orders["Sales Amount"] = 0.0
+
+# (optional) tiny sanity check you can remove later
+totals = orders.groupby("Month", observed=True)["Sales Amount"].sum()
+st.caption("Sales totals by month: " + ", ".join(f"{m}: ${v:,.2f}" for m, v in totals.items()))
+
+
+# months present in your orders, preserving calendar order
+available_months = [m for m in months_in_data if "Month" in orders.columns and (orders["Month"] == m).any()]
+default_idx = max(len(available_months) - 1, 0)
+
+c1, c2, c3 = st.columns([1.1, 1, 1])
+with c1:
+    sel_month = st.radio("Select Month", options=available_months or months_in_data, index=default_idx)
+with c2:
+    metric_label = st.selectbox("Metric", ["Count", "Sales Amount"], index=0)
+with c3:
+    top_n = st.slider("Top N", min_value=5, max_value=20, value=10, step=1)
+
+metric_col = "Count" if metric_label == "Count" else "Sales Amount"
+
+month_df = orders.loc[orders["Month"] == sel_month, ["Item Name", "Count", "Sales Amount"]].copy()
+
+if month_df.empty:
+    st.info(f"No rows found for {sel_month}.")
+else:
+    agg = month_df.groupby("Item Name", as_index=False)[metric_col].sum()
+    agg = agg.sort_values(metric_col, ascending=False).head(top_n).reset_index(drop=True)
+
+    import textwrap
+    agg["Label"] = agg["Item Name"].apply(lambda s: textwrap.fill(str(s), width=16))
+
+    title_metric = "Orders" if metric_col == "Count" else "Sales Amount ($)"
+    fig_top = px.bar(
+        agg,
+        x="Label",
+        y=metric_col,
+        text_auto=True,
+        color_discrete_sequence=["#5bc0de"]
+    )
+
+    # Visibility: solid black text, centered/larger title, clear background
+    fig_top.update_layout(
+        title=dict(
+            text=f"Top {len(agg)} Dishes in {sel_month} by {title_metric} 📊",
+            x=0.5, xanchor="center",
+            font=dict(size=26, color="black")
+        ),
+        font=dict(color="black", size=14),
+        xaxis_title="Dishes",
+        yaxis_title=title_metric,
+        xaxis_tickangle=-30,
+        bargap=0.25,
+        margin=dict(l=40, r=20, t=80, b=80),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+    )
+    fig_top.update_xaxes(
+        tickfont=dict(color="black", size=12),
+        title_font=dict(color="black", size=16),
+        showline=True, linecolor="black",
+        showgrid=True, gridcolor="lightgray"
+    )
+    fig_top.update_yaxes(
+        tickfont=dict(color="black", size=12),
+        title_font=dict(color="black", size=16),
+        showline=True, linecolor="black",
+        showgrid=True, gridcolor="lightgray",
+        separatethousands=True
+    )
+    if metric_col == "Sales Amount":
+        fig_top.update_yaxes(tickprefix="$")
+
+    fig_top.update_traces(textfont=dict(color="black", size=13), textposition="outside", cliponaxis=False)
+
+    st.plotly_chart(fig_top, use_container_width=True)
+
+
+
+
+# ------------------------------
+# 10) SIDEBAR: INGREDIENTS RUNNING LOW + DETAILED RESTOCK RECOMMENDATIONS
+# ------------------------------
+import datetime
+st.sidebar.header("Ingredients Running Low")
+
+# Timestamp of check
+today = datetime.datetime.now()
+st.sidebar.markdown(f"**Status checked:** {today.strftime('%B %d, %Y')}")
+
+if len(valid_cols) == 0:
+    st.sidebar.info("No valid ingredients available to check.")
+else:
+    last_month = months_in_data[-1]
+    current_data = monthly_totals[monthly_totals["Month"] == last_month]
+
+    max_per_ing = monthly_totals[valid_cols].max()
+    current_vals = current_data[valid_cols].iloc[0]
+    percent_remaining = (current_vals / max_per_ing) * 100
+    low_ingredients = percent_remaining[percent_remaining <= 25]
+
+    if low_ingredients.empty:
+        st.sidebar.success("No ingredients currently running low!")
+    else:
+        st.sidebar.warning(f"{len(low_ingredients)} ingredients running low.")
+        
+        # Bar chart
+        fig_low, ax_low = plt.subplots(figsize=(5, len(low_ingredients) * 0.4))
+        ax_low.barh(low_ingredients.index, low_ingredients.values, color="salmon")
+        ax_low.set_xlabel("% Remaining")
+        ax_low.set_title(f"Ingredients Running Low - {last_month}")
+        plt.tight_layout()
+        st.sidebar.pyplot(fig_low)
+
+        # ------------------------------------
+        # Shipment-based details per ingredient
+        # ------------------------------------
+        st.sidebar.markdown("### Detailed Restock Insights")
+
+        shipments.columns = [c.strip().lower().replace(" ", "_") for c in shipments.columns]
+
+        for ing, pct in low_ingredients.items():
+            st.sidebar.markdown(f"#### {ing}")
+            match = shipments[shipments["ingredient"].str.lower().str.contains(ing.lower(), na=False)]
+
+            if not match.empty:
+                row = match.iloc[0]
+                freq = str(row.get("frequency", "Unknown")).capitalize()
+                qty = row.get("quantity_per_shipment", "Unknown")
+                unit = row.get("unit_of_shipment", "")
+                est_supply = row.get("estimated_weekly_supply", "Unknown")
+                total_recv = row.get("total_received", "Unknown")
+
+                # Interpret timing and alert intensity
+                if pct <= 10:
+                    urgency = "Critically low – immediate restock needed!"
+                    suggestion = "Contact supplier ASAP or pull from backup stock."
+                    week = "Final week of the month"
+                elif pct <= 20:
+                    urgency = "Low supply detected."
+                    suggestion = "Restock during the third week to avoid shortages."
+                    week = "Third week of the month"
+                else:
+                    urgency = "Below ideal threshold."
+                    suggestion = "Monitor daily and prepare restock order."
+                    week = "Second week of the month"
+
+                # Smart frequency note
+                if "biweek" in freq.lower():
+                    freq_note = "Delivered twice per month (every 2 weeks)."
+                elif "week" in freq.lower():
+                    freq_note = "Delivered weekly."
+                elif "month" in freq.lower():
+                    freq_note = "Delivered monthly."
+                else:
+                    freq_note = "Delivery schedule not specified."
+
+                # Rich bullet point summary
+                st.sidebar.markdown(f"""
+                • **Status:** {urgency}  
+                • **Frequency:** {freq_note}  
+                • **Quantity per shipment:** {qty} {unit}  
+                • **Total received per cycle:** {total_recv} {unit}  
+                • **Estimated weekly supply:** {est_supply}  
+                • **Stock level:** {pct:.1f}% of normal usage remaining  
+                • **Suggested restock timing:** {week}  
+                • **Action:** {suggestion}
+                """)
+
+            else:
+                st.sidebar.markdown(f"""
+                • No shipment data found for **{ing}**.  
+                • Review manually and verify supplier frequency.  
+                • Recommended: Add entry to `shipmentfile.csv` for tracking.
+                """)
+
+        st.sidebar.markdown("---")
+        st.sidebar.caption("Data synced from shipmentfile.csv and monthly usage patterns.")
+
+
+# ------------------------------
+# 11) SIDEBAR: MONTHLY REVIEWS (May–October)
+# ------------------------------
+st.sidebar.header("Monthly Shipment Reviews")
+
+# Normalize column names
+shipments.columns = [c.strip().lower().replace(" ", "_") for c in shipments.columns]
+
+months = ["May", "June", "July", "August", "September", "October"]
+
+for month in months:
+    st.sidebar.subheader(f"Monthly Review: {month}")
+    st.sidebar.markdown(f"**Start Date:** {month} 1, 2025")
+    
+    # Loop through all ingredients in shipment file
+    for _, row in shipments.iterrows():
+        ingredient = row.get("ingredient", "Unknown Ingredient")
+        freq = str(row.get("frequency", "Unknown")).capitalize()
+        qty = row.get("quantity_per_shipment", "N/A")
+        unit = row.get("unit_of_shipment", "")
+        est_supply = row.get("estimated_weekly_supply", "N/A")
+        total_recv = row.get("total_received", "N/A")
+        
+        # Calculate next restock based on frequency
+        start_date = pd.to_datetime(f"2025-{month}-01", errors="coerce")
+        if "week" in freq.lower():
+            interval = 7
+        elif "biweek" in freq.lower():
+            interval = 14
+        elif "month" in freq.lower():
+            interval = 30
+        else:
+            interval = 14  # fallback
+
+        next_restock = start_date + pd.Timedelta(days=interval)
+        next_restock_str = next_restock.strftime("%B %d, %Y")
+        
+        # Bullet point summary per ingredient
+        st.sidebar.markdown(f"""
+        • **{ingredient}**  
+            - Restocked: {freq}  
+            - Next restock due: {next_restock_str}  
+            - Quantity per shipment: {qty} {unit}  
+            - Estimated weekly supply: {est_supply}  
+            - Total received this cycle: {total_recv}
+        """)
+    
+    st.sidebar.markdown("---")
+
