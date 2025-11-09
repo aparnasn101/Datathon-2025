@@ -3,12 +3,6 @@
 
 An interactive **Streamlit dashboard** for analyzing ingredient usage, monthly trends, and forecasting future demand for Mai Shan Yun’s restaurant operations.
 
-# Mai Shan Yun Data Analysis Dashboard
-
-An interactive **Streamlit dashboard** for analyzing ingredient usage, monthly trends, and forecasting future demand for Mai Shan Yun’s restaurant operations.
-
----
-
 ## Overview
 
 This project combines restaurant order data, ingredient usage, and shipment records to visualize how ingredients are consumed over time and predict future usage using linear regression.
