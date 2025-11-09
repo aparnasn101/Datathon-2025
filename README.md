@@ -48,8 +48,9 @@ Built for **Mai Shan Yun** as part of a data analysis project for TAMU Datathon 
 ## Data Files
 
 We used the following data files to create new files to be used for the dashboard:
-| File |
-|---------------|
+
+| File Name |
+|------------|
 | `August_Data_Matrix (1).xlsx` |
 | `July_Data_Matrix (1).xlsx` |
 | `June_Data_Matrix.xlsx` |
