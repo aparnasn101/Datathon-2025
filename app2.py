@@ -1,4 +1,4 @@
-##Top 3 Most popular dishes
+##Top 5 Most popular dishes
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -111,3 +111,4 @@ with c2:
    
 
             
+
