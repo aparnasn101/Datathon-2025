@@ -70,6 +70,8 @@ We condensed this data into the following files that we used for the dashboard:
 
 Make sure these files are placed in the same directory as `app.py`, `app2.py`, and `low_ingredients_alert.py`.
 
+The final dashboard is titled `FinalDashboard.py`.
+
 ---
 ## Setup and Run instructions
 
