@@ -1,3 +1,6 @@
+# ------------------------------
+# 0) AESTHETIC STYLING
+# ------------------------------
 st.markdown(
     """
     <style>
@@ -22,13 +25,16 @@ st.markdown(
 
       /* Sidebar background */
       .sidebar .sidebar-content {
-          background-color: #fff7f2;  /* pastel pinkish cream */
+          background-color: #d4f1f9;  /* pastel blue */
+          color: black;
+          font-family: Georgia, serif;
       }
 
       /* Tables styling */
       .stDataFrame table {
           background-color: #fff8f3;
           color: black;
+          font-family: Georgia, serif;
       }
 
       /* Markdown text in app and sidebar */
@@ -37,12 +43,29 @@ st.markdown(
           font-family: Georgia, serif !important;
       }
 
-      /* Plotly chart background */
-      .js-plotly-plot {
-          background-color: #fdf6f0 !important;
+      /* Horizontal divider styling for sections */
+      hr {
+          border: 0;
+          height: 1px;
+          background-color: #cfcfcf;
+          margin-top: 20px;
+          margin-bottom: 20px;
       }
 
-      /* Optional: bar chart colors and font sizes */
+      /* Plotly chart background and font */
+      .js-plotly-plot {
+          background-color: #fdf6f0 !important;
+          font-family: Georgia, serif !important;
+          color: black !important;
+      }
+
+      /* Plotly axis titles and labels */
+      .plotly .xtick text, .plotly .ytick text, .plotly .axis-title {
+          font-family: Georgia, serif !important;
+          color: black !important;
+      }
+
+      /* Optional: bar chart text */
       .plotly .bar text {
           font-family: Georgia, serif !important;
           color: black !important;
@@ -51,3 +74,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
